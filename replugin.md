@@ -2,7 +2,7 @@
 [Replugin](https://github.com/Qihoo360/RePlugin)是360出品的插件化框架，本文通过源码分析，实现一个最简单的插件化框架
 
 
-宿主： 就是当前运行的APP插件： 相对于插件化技术来说，就是要加载运行的apk类文件
+
 ## 怎么实现插件化
 Android插件化需要解决的三个问题
 ![](./img/how2plugin1.png)
