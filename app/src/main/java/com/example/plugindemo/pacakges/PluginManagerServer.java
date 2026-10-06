@@ -31,11 +31,13 @@ import com.example.plugindemo.loader.PluginNativeLibsHelper;
 import com.example.plugindemo.loader.PmBase;
 import com.example.plugindemo.model.Plugin;
 import com.example.plugindemo.model.PluginInfo;
+import com.example.plugindemo.util.FilePermissionUtils;
 import com.example.plugindemo.util.FileUtils;
 
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 
 
 /**
@@ -51,6 +53,44 @@ public class PluginManagerServer {
 
     private static final String TAG = "PluginManagerServer";
 
+    /**
+     * 内置在宿主 assets 里的插件 APK 文件名
+     */
+    private static final String PLUGIN_ASSET_NAME = "plugin01.apk";
+
+    /**
+     * 把 assets 里内置的插件 APK 释放到 {@code cacheDir/plugin01.apk}，返回释放后的路径。
+     * <p>
+     * 每次安装前都要调用：{@link #installLocked} 会把 cache 里的 APK <b>移动</b>到
+     * plugins_v3 目录，所以第二次点「install」时 cache 里已经没有文件了。
+     *
+     * @return 释放后的 APK 绝对路径；assets 里没有内置插件时返回 null
+     */
+    public static String ensurePluginApk(Context context) {
+        File target = new File(context.getCacheDir(), PLUGIN_ASSET_NAME);
+        InputStream in;
+        try {
+            in = context.getAssets().open(PLUGIN_ASSET_NAME);
+        } catch (IOException e) {
+            if (LogDebug.LOG) {
+                LogDebug.e(TAG, "ensurePluginApk: assets 里没有内置插件 " + PLUGIN_ASSET_NAME, e);
+            }
+            return null;
+        }
+        try {
+            // copyInputStreamToFile 内部会关闭输入流
+            FileUtils.copyInputStreamToFile(in, target);
+        } catch (IOException e) {
+            if (LogDebug.LOG) {
+                LogDebug.e(TAG, "ensurePluginApk: 释放插件失败", e);
+            }
+            return null;
+        }
+        if (LogDebug.LOG) {
+            LogDebug.i(TAG, "ensurePluginApk: " + target.getAbsolutePath() + " (" + target.length() + " bytes)");
+        }
+        return target.getAbsolutePath();
+    }
 
     public static PluginInfo installLocked(Context mContext,String path) {
         final boolean verifySignEnable = false;
@@ -115,6 +155,12 @@ public class PluginManagerServer {
         }
 
         instPli.setPath(newFile.getAbsolutePath());
+
+        // Android 14 (API 34) 起，动态加载的 dex/jar 必须是「只读」的，否则 DexClassLoader
+        // 会直接抛异常。插件 APK 落在 getDir("plugins_v3") 里默认是可写的，这里显式置为 r--r--r--。
+        // 注意：odex 的释放目录是旁边的 oat/ 子目录，不在这个文件上，不受影响。
+        FilePermissionUtils.setPermissions(newFile.getPath(),
+                FilePermissionUtils.S_IRUSR | FilePermissionUtils.S_IRGRP | FilePermissionUtils.S_IROTH, -1, -1);
 
         return true;
     }

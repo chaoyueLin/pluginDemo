@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">PluginOther</string>
+    <string name="hello_from_plugin">Hello from plugin!</string>
+    <string name="open_second">打开第二个插件页面</string>
+    <string name="close_plugin">关闭插件页面</string>
+    <string name="second_page">第二个插件页面（复用同一个坑位）</string>
+    <string name="back">返回</string>
+</resources>

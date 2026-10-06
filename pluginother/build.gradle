@@ -1,0 +1,33 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace 'com.example.pluginother'
+    compileSdk 36
+    buildToolsVersion "36.0.0"
+
+    defaultConfig {
+        // 注意：这个 applicationId 是宿主写死的约定，见 PluginInfo.getPackageName()
+        applicationId "com.example.pluginother"
+        minSdkVersion 21
+        targetSdkVersion 34
+        versionCode 1
+        versionName "1.0"
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+// 插件是被宿主动态加载的，刻意不引任何第三方依赖（包括 AppCompat），
+// 只用 android.* 平台 API。原因有二：
+//   1. 插件的 dex 由宿主的 PluginDexClassLoader 加载，宿主已有的类不该被重复打包；
+//   2. 插件 Activity 继承 android.app.Activity，才能被宿主的坑位机制直接实例化。
+dependencies {
+}

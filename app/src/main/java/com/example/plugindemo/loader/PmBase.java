@@ -29,12 +29,30 @@ public class PmBase {
      */
     private ClassLoader mClassLoader;
 
-    private Map<String,String> activityMap=new HashMap<>();
+    /**
+     * 「坑位类名 → 插件 Activity 类名」的映射表。
+     * <p>
+     * One Hook 的核心：系统以为自己在加载坑位类 {@code com.example.plugindemo.Activity01}，
+     * 其实被换成了插件里的 Activity 类。坑位会被多个插件 Activity 复用，
+     * 所以这张表由 {@code PluginProcessPer.bindActivity()} 在每次启动前动态刷新。
+     */
+    private final Map<String,String> activityMap=new ConcurrentHashMap<>();
 
     public PmBase(Context context) {
         //
         mContext = context;
         activityMap.put(MainActivity.ACTIVITY_FROM,MainActivity.ACTIVITY_TO);
+    }
+
+    /**
+     * 登记本次启动要用的「坑位 → 插件 Activity」映射。
+     * 必须在 startActivity 之前调用，否则系统加载坑位类时就换不成插件类了。
+     */
+    public void setActivityMapping(String container, String activity) {
+        if (TextUtils.isEmpty(container) || TextUtils.isEmpty(activity)) {
+            return;
+        }
+        activityMap.put(container, activity);
     }
 
     /**
@@ -118,7 +136,7 @@ public class PmBase {
             }
 
             // 找到已经存在的
-            Plugin existedPlugin = mPlugins.get(info.getPackageName());
+            Plugin existedPlugin = mPlugins.get(info.getName());
 
         } else {
             // 同时加入PackageName和Alias（如有）

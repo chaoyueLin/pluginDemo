@@ -12,3 +12,6 @@
 /captures
 .externalNativeBuild
 .cxx
+
+# 由 :app:copyPluginApk 任务从 pluginother 的构建产物拷贝而来，不提交
+/app/src/main/assets/plugin01.apk

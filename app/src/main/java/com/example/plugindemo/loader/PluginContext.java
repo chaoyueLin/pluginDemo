@@ -33,6 +33,7 @@ import android.view.View;
 import android.view.ViewStub;
 
 import com.example.plugindemo.ContextInjector;
+import com.example.plugindemo.PluginProcessPer;
 import com.example.plugindemo.helper.LogDebug;
 import com.example.plugindemo.model.Constant;
 import com.example.plugindemo.util.FilePermissionUtils;
@@ -451,42 +452,43 @@ public class PluginContext extends ContextThemeWrapper {
 
     @Override
     public void startActivity(Intent intent) {
-        // HINT 只有插件Application才会走这里
-        // 而Activity.startActivity系统最终会走startActivityForResult，不会走这儿
-
-        // 这里会被调用两次：
-        // 第一次：获取各种信息，最终确认坑位，并走startActivity，再次回到这里
-        // 第二次：判断要打开的是“坑位Activity”，则返回False，直接走super，后面的事情你们都懂的
-        // 当然，如果在获取坑位信息时遇到任何情况（例如要打开的是宿主的Activity），则直接返回false，走super
-//        if (!Factory2.startActivity(this, intent)) {
-//            if (mContextInjector != null) {
-//                mContextInjector.startActivityBefore(intent);
-//            }
-//
-//            super.startActivity(intent);
-//
-//            if (mContextInjector != null) {
-//                mContextInjector.startActivityAfter(intent);
-//            }
-//        }
+        // 走的是「插件 Context 发起的跳转」（Activity.startActivity 不会走这里，
+        // 它最终会走 startActivityForResult）。先把插件内的目标 Activity 绑到宿主坑位上，
+        // 再交给系统按普通流程启动。
+        bindPluginActivityIfNeeded(intent);
+        super.startActivity(intent);
     }
 
     @Override
     public void startActivity(Intent intent, Bundle options) {
-        // HINT 保险起见，startActivity写两套相似逻辑
-        // 具体见startActivity(intent)的描述（上面）
-//        if (!Factory2.startActivity(this, intent)) {
-//            if (mContextInjector != null) {
-//                mContextInjector.startActivityBefore(intent, options);
-//            }
-//
-//            super.startActivity(intent, options);
-//
-//            if (mContextInjector != null) {
-//                mContextInjector.startActivityAfter(intent, options);
-//            }
-//        }
+        // 保险起见，startActivity 写两套相似逻辑
+        bindPluginActivityIfNeeded(intent);
+        super.startActivity(intent, options);
     }
+
+    /**
+     * 如果 intent 指向的是本插件 Manifest 里声明的 Activity，就把它重定向到宿主坑位。
+     * <p>
+     * 绑不上时什么都不做（例如目标其实是宿主的 Activity，或者是个隐式 Intent），
+     * 由调用方走系统默认流程。
+     */
+    private void bindPluginActivityIfNeeded(Intent intent) {
+        if (intent == null || intent.getComponent() == null || mLoader.mComponents == null) {
+            // 隐式 Intent 没法直接查表，交回系统
+            return;
+        }
+        String target = intent.getComponent().getClassName();
+        if (mLoader.mComponents.getActivity(target) == null) {
+            return;
+        }
+        // loadPluginActivity 内部会把 intent 的 component 改写成宿主坑位
+        PluginProcessPer.loadPluginActivity(intent, mPlugin, target);
+    }
+
+    // ------
+    // 注意：下面这几个 Service 相关的方法是「有意的空实现」，本次只做 Activity 插件化。
+    // 直接调用它们不会有任何效果，接入 Service 时需要连同宿主侧的 Service 坑位一起补。
+    // ------
 
     @Override
     public ComponentName startService(Intent service) {

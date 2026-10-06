@@ -30,8 +30,11 @@ import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.text.TextUtils;
 
+import com.example.plugindemo.PluginHostApplication;
 import com.example.plugindemo.RePluginInternal;
 import com.example.plugindemo.helper.LogDebug;
+import com.example.plugindemo.loader.PmBase;
+import com.example.plugindemo.model.Plugin;
 
 import java.util.HashMap;
 
@@ -59,25 +62,57 @@ public class ActivityInjector {
      */
     public static boolean inject(Activity realActivity, String plugin) {
 
-        ActivityInfo ai = getActivity(realActivity);
+        // 优先取「插件自己声明的 ActivityInfo」：它的 label/icon 是插件包里的资源 id，
+        // 正好能用插件 Activity 的 Resources 解析出来，这才是插件 Activity 该有的标题和图标。
+        ActivityInfo ai = getPluginActivity(realActivity, plugin);
+        if (ai == null) {
+            // 兜底：拿不到插件信息时（例如插件还没加载）退回宿主自己的 ActivityInfo
+            ai = getActivity(realActivity);
+        }
         return ai != null && inject(realActivity, ai, getFrameworkVersion());
 
     }
 
+    /**
+     * 从插件自己的 ComponentList 里查这个 Activity 的 ActivityInfo
+     */
+    private static ActivityInfo getPluginActivity(Activity realActivity, String plugin) {
+        PmBase pmBase = PluginHostApplication.sPmBase;
+        if (pmBase == null || TextUtils.isEmpty(plugin)) {
+            return null;
+        }
+        Plugin p = pmBase.getPlugin(plugin);
+        if (p == null || p.mLoader == null || p.mLoader.mComponents == null) {
+            return null;
+        }
+        return p.mLoader.mComponents.getActivity(realActivity.getClass().getName());
+    }
+
+    /**
+     * 从宿主自己的 PackageInfo 里查 ActivityInfo。注意插件 Activity 不属于宿主包，查不到。
+     */
     private static ActivityInfo getActivity(Activity realActivity) {
-        PackageInfo pi= null;
+        PackageInfo pi = null;
         try {
-            pi = realActivity.getApplicationContext().getPackageManager().getPackageInfo(realActivity.getApplicationContext().getPackageName(), 0);
+            // 必须带 GET_ACTIVITIES，否则 PackageInfo.activities 是 null
+            pi = realActivity.getApplicationContext().getPackageManager()
+                    .getPackageInfo(realActivity.getApplicationContext().getPackageName(),
+                            PackageManager.GET_ACTIVITIES);
         } catch (PackageManager.NameNotFoundException e) {
             e.printStackTrace();
         }
+        if (pi == null || pi.activities == null || pi.activities.length == 0) {
+            return null;
+        }
+        // NOTE 插件 Activity 的类不属于宿主包，这里是查不到的；能匹配上的只有宿主自己的 Activity，
+        // 匹配不到时退回第一个，保证「最近任务」至少有个描述可用。
+        String name = realActivity.getClass().getName();
         for (ActivityInfo ai : pi.activities) {
-            if(TextUtils.equals(ai.name,realActivity.getClass().getSimpleName())){
+            if (TextUtils.equals(ai.name, name)) {
                 return ai;
             }
         }
         return pi.activities[0];
-
     }
 
 

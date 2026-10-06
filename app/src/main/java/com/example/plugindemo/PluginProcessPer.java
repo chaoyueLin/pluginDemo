@@ -26,7 +26,15 @@ import static com.example.plugindemo.helper.LogDebug.PLUGIN_TAG;
 public class PluginProcessPer {
 
 
-    private final static PmBase mPluginMgr=PluginHostApplication.sPmBase;
+    /**
+     * 插件管理器。
+     * <p>
+     * 不能写成 {@code static final} 在类初始化时取值 —— 那样 PluginProcessPer 一旦被提前
+     * 加载（例如被别的 static 引用到），就会永久缓存一个 null。这里每次惰性取。
+     */
+    private static PmBase pluginMgr() {
+        return PluginHostApplication.sPmBase;
+    }
 
     /**
      * 加载插件；找到目标Activity；搜索匹配容器；加载目标Activity类；建立临时映射；返回容器
@@ -39,7 +47,7 @@ public class PluginProcessPer {
     static String bindActivity(String plugin, String activity, Intent intent) {
 
         /* 获取插件对象 */
-        Plugin p = mPluginMgr.loadAppPlugin(plugin);
+        Plugin p = pluginMgr().loadAppPlugin(plugin);
         if (p == null) {
             if (LOG) {
                 LogDebug.w(PLUGIN_TAG, "PACM: bindActivity: may be invalid plugin name or load plugin failed: plugin=" + plugin);
@@ -74,6 +82,12 @@ public class PluginProcessPer {
             }
             return null;
         }
+
+        // 坑位是复用的：把「坑位类名 → 本次要启动的插件 Activity」写进映射表。
+        // 系统随后会去加载坑位类 com.example.plugindemo.Activity01，
+        // RePluginClassLoader → PmBase.loadClass 就是靠这张表把类换成插件 Activity 的。
+        // 必须赶在 startActivity 之前写，否则系统加载坑位类时就换不成插件类了。
+        pluginMgr().setActivityMapping(container, activity);
 
         if (LOG) {
             LogDebug.d(PLUGIN_TAG, "PACM: bindActivity: lookup activity container: container=" + container);
@@ -148,7 +162,7 @@ public class PluginProcessPer {
      */
     private static ActivityInfo getActivityInfo(String plugin, String activity, Intent intent) {
         // 获取插件对象
-        Plugin p = mPluginMgr.loadAppPlugin(plugin);
+        Plugin p = pluginMgr().loadAppPlugin(plugin);
         if (p == null) {
             if (LOG) {
                 LogDebug.d(PLUGIN_TAG, "PACM: bindActivity: may be invalid plugin name or load plugin failed: plugin=" + p);
@@ -203,9 +217,8 @@ public class PluginProcessPer {
         return true;
     }
 
-    fetchviewbyplugin
     public String fetchPluginName(ClassLoader cl) {
-        Plugin p = mPluginMgr.lookupPlugin(cl);
+        Plugin p = pluginMgr().lookupPlugin(cl);
         if (p == null) {
             // 没有拿到插件的
             return null;
@@ -225,7 +238,7 @@ public class PluginProcessPer {
         if (LOG) {
             LogDebug.d(PLUGIN_TAG, "createActivityContext=" + activity.getClass().getName());
         }
-        Plugin plugin = mPluginMgr.lookupPlugin(activity.getClass().getClassLoader());
+        Plugin plugin = pluginMgr().lookupPlugin(activity.getClass().getClassLoader());
         if (plugin == null) {
             if (LOG) {
                 LogDebug.d(PLUGIN_TAG, "PACM: createActivityContext: can't found plugin object for activity=" + activity.getClass().getName());

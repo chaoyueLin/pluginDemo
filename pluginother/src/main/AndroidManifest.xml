@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        这个 APK 不会被系统安装，它只是宿主的一个普通文件：
+        宿主用 PackageManager.getPackageArchiveInfo() 读它，再用自己的 PluginDexClassLoader
+        加载它。所以这里声明的 Activity 不会进系统的 PackageManagerService，
+        真正启动它们靠的是宿主 Manifest 里的「坑位」Activity01。
+    -->
+    <application
+        android:allowBackup="false"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.DeviceDefault.Light">
+
+        <!-- 宿主 MainActivity.ACTIVITY_TO 写死的就是这个类名 -->
+        <activity
+            android:name=".OtherActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.DeviceDefault.Light" />
+
+        <activity
+            android:name=".SecondActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.DeviceDefault.Light" />
+    </application>
+
+</manifest>
